@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="it">
-<head><meta charset="utf-8"><title>Gate Telegram Sicuro</title></head>
+<head>
+  <meta charset="utf-8">
+  <title>Gate Telegram Sicuro</title>
+</head>
 <body>
   <h1>Verifica per accedere al link</h1>
   <div id="msg" style="color:red"></div>
@@ -13,22 +16,27 @@
 
     btn.addEventListener('click', async () => {
       msg.textContent = '';
-      if (!token) { msg.textContent = 'Token mancante nella URL.'; return; }
+      if (!token) {
+        msg.textContent = 'Token mancante nella URL.';
+        return;
+      }
 
       try {
-        const resp = await fetch('/.netlify/functions/verify-token', {
+        const resp = await fetch('https://resonant-faloodeh-488c98.netlify.app/.netlify/functions/verify-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token })
         });
+
         const data = await resp.json();
-        if (data.success) {
-          window.location.href = data.telegram;
+
+        if (data.ok) {
+          window.location.href = data.url; // reindirizza al gruppo Telegram
         } else {
           msg.textContent = data.error || 'Errore durante la verifica.';
         }
       } catch (e) {
-        msg.textContent = 'Errore di rete.';
+        msg.textContent = 'Errore di rete: ' + e;
       }
     });
   </script>
