@@ -2,43 +2,88 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <title>Gate Telegram Sicuro</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Verifica per accedere al link</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;padding:20px}
+    .card{max-width:520px;width:100%;text-align:center;border-radius:12px;padding:24px;box-shadow:0 6px 18px rgba(0,0,0,0.08)}
+    h1{margin:0 0 12px;font-size:20px}
+    #msg{min-height:20px;margin:12px 0;color:#c00}
+    button{padding:10px 16px;font-size:16px;border-radius:8px;border:0;cursor:pointer}
+    button[disabled]{opacity:.6;cursor:not-allowed}
+  </style>
 </head>
 <body>
-  <h1>Verifica per accedere al link</h1>
-  <div id="msg" style="color:red"></div>
-  <button id="accessBtn">Accedi al gruppo Telegram</button>
+  <div class="card">
+    <h1>Verifica per accedere al link</h1>
+    <div id="msg" aria-live="polite"></div>
+    <button id="accessBtn">Accedi al gruppo Telegram</button>
+    <p style="font-size:12px;color:#666;margin-top:12px">Token monouso — valido 5 minuti. Non premere più volte.</p>
+  </div>
 
   <script>
-    const btn = document.getElementById('accessBtn');
-    const msg = document.getElementById('msg');
-    const token = new URLSearchParams(location.search).get('t');
+    (function(){
+      const siteBase = "https://resonant-faloodeh-488c98.netlify.app"; // il tuo sito Netlify
+      const verifyUrl = siteBase + "/.netlify/functions/verify-token";
 
-    btn.addEventListener('click', async () => {
-      msg.textContent = '';
+      const btn = document.getElementById('accessBtn');
+      const msg = document.getElementById('msg');
+      const token = new URLSearchParams(location.search).get('t');
+
+      function setMsg(s, isError = true) {
+        msg.textContent = s;
+        msg.style.color = isError ? '#c00' : '#080';
+      }
+
       if (!token) {
-        msg.textContent = 'Token mancante nella URL.';
+        setMsg('Token mancante nella URL. Apri il link fornito (es. ?t=TOKEN).');
+        btn.disabled = true;
         return;
       }
 
-      try {
-        const resp = await fetch('https://resonant-faloodeh-488c98.netlify.app/.netlify/functions/verify-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token })
-        });
+      let inProgress = false;
 
-        const data = await resp.json();
+      btn.addEventListener('click', async () => {
+        if (inProgress) return;
+        inProgress = true;
+        btn.disabled = true;
+        setMsg('Verifica in corso...', false);
 
-        if (data.ok) {
-          window.location.href = data.url; // reindirizza al gruppo Telegram
-        } else {
-          msg.textContent = data.error || 'Errore durante la verifica.';
+        try {
+          const resp = await fetch(verifyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
+          });
+
+          // se la risposta HTTP non è 200 ok, leggiamo comunque il body
+          const data = await resp.json().catch(()=>null);
+
+          if (resp.ok && data && (data.success === true || data.ok === true)) {
+            // il campo che la tua funzione usa sembra essere `success` e `telegram`
+            const destination = data.telegram || data.url || data.redirect || null;
+            if (destination) {
+              setMsg('Verifica ok — reindirizzamento...', false);
+              // piccolo delay per dare tempo all'utente di leggere
+              setTimeout(()=> window.location.href = destination, 300);
+              return;
+            } else {
+              setMsg('Verifica riuscita ma nessun URL di destinazione trovato.');
+            }
+          } else {
+            // gestione errori restituiti dal server
+            const err = (data && (data.error || data.message)) || ('Errore durante la verifica (HTTP ' + resp.status + ')');
+            setMsg(err);
+          }
+        } catch (e) {
+          setMsg('Errore di rete: ' + (e.message || e));
+        } finally {
+          inProgress = false;
+          // non riabilitare il bottone perché token è monouso — lascialo disabilitato
+          btn.disabled = true;
         }
-      } catch (e) {
-        msg.textContent = 'Errore di rete: ' + e;
-      }
-    });
+      });
+    })();
   </script>
 </body>
 </html>
